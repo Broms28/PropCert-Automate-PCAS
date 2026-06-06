@@ -3,8 +3,9 @@ import shutil
 from datetime import date
 from typing import Optional
 from db import get_session, CertificateType
+from config_manager import get_base_dir
 
-BASE_DIR = r"C:\Office Workfiles"
+BASE_DIR = get_base_dir()
 
 def get_safe_name(name: str) -> str:
     return "".join(c for c in name if c.isalnum() or c in " -_,").strip()

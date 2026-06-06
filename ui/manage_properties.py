@@ -1,13 +1,14 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, 
-    QLabel, QInputDialog, QMessageBox, QFileDialog, QAbstractItemView
+    QLabel, QInputDialog, QMessageBox, QFileDialog, QAbstractItemView, QListWidgetItem, QStackedWidget
 )
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import Qt, QUrl
 from db import get_session, Company, Property, Flat
 import os
+from config_manager import get_base_dir
 
-BASE_DIR = r"C:\Office Workfiles"
+BASE_DIR = get_base_dir()
 
 class ManagePropertiesWidget(QWidget):
     def __init__(self):
@@ -48,11 +49,20 @@ class ManagePropertiesWidget(QWidget):
         # Properties List
         prop_layout = QVBoxLayout()
         prop_layout.addWidget(QLabel("Properties"))
+        self.prop_stack = QStackedWidget()
+        
         self.prop_list = QListWidget()
         self.prop_list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.prop_list.itemSelectionChanged.connect(self.on_property_selected)
         self.prop_list.itemDoubleClicked.connect(self.open_property_folder)
-        prop_layout.addWidget(self.prop_list)
+        
+        self.prop_label = QLabel("Please select a company")
+        self.prop_label.setAlignment(Qt.AlignCenter)
+        self.prop_label.setStyleSheet("font-weight: bold; color: #9ca3af; font-size: 16pt;")
+        
+        self.prop_stack.addWidget(self.prop_list)
+        self.prop_stack.addWidget(self.prop_label)
+        prop_layout.addWidget(self.prop_stack)
         
         btn_layout_p = QHBoxLayout()
         self.btn_add_p = QPushButton(" Add")
@@ -72,10 +82,19 @@ class ManagePropertiesWidget(QWidget):
         # Flats List
         flat_layout = QVBoxLayout()
         flat_layout.addWidget(QLabel("Flats"))
+        self.flat_stack = QStackedWidget()
+        
         self.flat_list = QListWidget()
         self.flat_list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.flat_list.itemDoubleClicked.connect(self.open_flat_folder)
-        flat_layout.addWidget(self.flat_list)
+        
+        self.flat_label = QLabel("Please select a property")
+        self.flat_label.setAlignment(Qt.AlignCenter)
+        self.flat_label.setStyleSheet("font-weight: bold; color: #9ca3af; font-size: 16pt;")
+        
+        self.flat_stack.addWidget(self.flat_list)
+        self.flat_stack.addWidget(self.flat_label)
+        flat_layout.addWidget(self.flat_stack)
         
         btn_layout_f = QHBoxLayout()
         self.btn_add_f = QPushButton(" Add")
@@ -95,6 +114,27 @@ class ManagePropertiesWidget(QWidget):
         layout.addLayout(comp_layout)
         layout.addLayout(prop_layout)
         layout.addLayout(flat_layout)
+        
+        self.update_prop_state(False)
+        self.update_flat_state(False)
+
+    def update_prop_state(self, enabled):
+        self.btn_add_p.setEnabled(enabled)
+        self.btn_folder_p.setEnabled(enabled)
+        self.btn_del_p.setEnabled(enabled)
+        if enabled:
+            self.prop_stack.setCurrentIndex(0)
+        else:
+            self.prop_stack.setCurrentIndex(1)
+
+    def update_flat_state(self, enabled):
+        self.btn_add_f.setEnabled(enabled)
+        self.btn_folder_f.setEnabled(enabled)
+        self.btn_del_f.setEnabled(enabled)
+        if enabled:
+            self.flat_stack.setCurrentIndex(0)
+        else:
+            self.flat_stack.setCurrentIndex(1)
 
     def load_companies(self):
         self.comp_list.clear()
@@ -105,12 +145,19 @@ class ManagePropertiesWidget(QWidget):
             self.comp_list.addItem(c.name)
             item = self.comp_list.item(self.comp_list.count() - 1)
             item.setData(32, c.id)
+            
+        self.update_prop_state(False)
+        self.update_flat_state(False)
 
     def on_company_selected(self):
-        self.prop_list.clear()
-        self.flat_list.clear()
+        self.update_flat_state(False)
         items = self.comp_list.selectedItems()
-        if not items: return
+        if not items: 
+            self.update_prop_state(False)
+            return
+            
+        self.update_prop_state(True)
+        self.prop_list.clear()
         comp_id = items[0].data(32)
         
         properties = self.session.query(Property).filter(Property.company_id == comp_id).order_by(Property.address).all()
@@ -124,9 +171,13 @@ class ManagePropertiesWidget(QWidget):
         def natural_sort_key(flat):
             return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', flat.name)]
 
-        self.flat_list.clear()
         items = self.prop_list.selectedItems()
-        if not items: return
+        if not items: 
+            self.update_flat_state(False)
+            return
+            
+        self.update_flat_state(True)
+        self.flat_list.clear()
         prop_id = items[0].data(32)
         
         flats = self.session.query(Flat).filter(Flat.property_id == prop_id).all()
@@ -145,6 +196,14 @@ class ManagePropertiesWidget(QWidget):
         name, ok = QInputDialog.getText(self, "Add Company", "Company Name:")
         if ok and name:
             c = Company(name=name)
+            reply = QMessageBox.question(self, 'Folder Location', 
+                                         "Would you like to set a custom folder location for this company now?",
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                folder = QFileDialog.getExistingDirectory(self, f"Select Folder for {name}")
+                if folder:
+                    c.folder_path = folder
+                    
             self.session.add(c)
             self.session.commit()
             self.load_companies()
@@ -248,6 +307,14 @@ class ManagePropertiesWidget(QWidget):
         name, ok = QInputDialog.getText(self, "Add Flat", "Flat Name (e.g. Flat 1):")
         if ok and name:
             f = Flat(property_id=prop_id, name=name)
+            reply = QMessageBox.question(self, 'Folder Location', 
+                                         "Would you like to set a custom folder location for this flat now?",
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                folder = QFileDialog.getExistingDirectory(self, f"Select Folder for {name}")
+                if folder:
+                    f.folder_path = folder
+                    
             self.session.add(f)
             self.session.commit()
             self.on_property_selected()

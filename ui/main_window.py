@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QTabWidget, QFileDialog, QMessageBox, QHeaderView, QInputDialog, QToolButton, QMenu
 )
 from PySide6.QtGui import QColor, QDesktopServices
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QUrl, QTimer
 from db import engine, get_session, Certificate, CertificateType
 import pandas as pd
 import datetime
@@ -17,12 +17,16 @@ import os
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Property Certificate Management App")
+        self.setWindowTitle("PCAS - Property Certificate Automation System")
         self.resize(1000, 700)
         self.session = get_session()
         # Dictionary to store tables for each cert type
         self.tables = {}
         self.setup_ui()
+        
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.timeout.connect(self.load_data)
+        self.refresh_timer.start(600000) # 10 minutes
 
     def setup_ui(self):
         self.tabs = QTabWidget()

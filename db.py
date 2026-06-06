@@ -49,7 +49,10 @@ class Certificate(Base):
     flat = relationship("Flat", back_populates="certificates")
 
 # Setup engine and session
-db_path = os.path.join(os.path.dirname(__file__), 'data.db')
+from config_manager import get_base_dir
+BASE_DIR = get_base_dir()
+os.makedirs(BASE_DIR, exist_ok=True)
+db_path = os.path.join(BASE_DIR, 'data.db')
 engine = create_engine(f'sqlite:///{db_path}', echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
