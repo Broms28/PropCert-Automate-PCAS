@@ -1,0 +1,164 @@
+/* Global Settings */
+* {
+    font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+    font-size: 14pt;
+    color: #1f2937; /* Dark Gray / Black for text */
+}
+
+QToolTip {
+    color: #ffffff;
+    background-color: #2a2a2a;
+    border: 1px solid white;
+}
+
+/* Main Window & Dialogs */
+QMainWindow, QDialog, QWidget {
+    background-color: #f3f4f6; /* Very light gray background */
+}
+
+/* Buttons */
+QPushButton {
+    background-color: #3b82f6; /* Modern Blue */
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background-color: #2563eb; /* Darker blue on hover */
+}
+
+QPushButton:pressed {
+    background-color: #1d4ed8;
+}
+
+QPushButton:disabled {
+    background-color: #9ca3af;
+    color: #e5e7eb;
+}
+
+/* Tabs */
+QTabWidget::pane {
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 4px;
+}
+
+QTabBar::tab {
+    background: #e5e7eb;
+    color: #4b5563;
+    padding: 12px 24px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    margin-right: 2px;
+    font-weight: bold;
+}
+
+QTabBar::tab:selected {
+    background: white;
+    color: #1d4ed8; /* Blue text for active tab */
+    border-bottom: 3px solid #3b82f6; /* Blue underline */
+}
+
+QTabBar::tab:hover:!selected {
+    background: #d1d5db;
+}
+
+/* Table */
+QTableWidget {
+    background-color: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    gridline-color: #e5e7eb;
+}
+
+QHeaderView::section {
+    background-color: #eff6ff; /* Very light blue header */
+    color: #1e3a8a; /* Dark blue header text */
+    padding: 8px;
+    border: none;
+    border-right: 1px solid #d1d5db;
+    border-bottom: 2px solid #93c5fd;
+    font-weight: bold;
+}
+
+QTableWidget::item {
+    padding: 4px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+QTableWidget::item:selected {
+    background-color: #bfdbfe; /* Light blue selection */
+    color: black;
+}
+
+/* Input Fields & Dropdowns */
+QLineEdit, QComboBox, QDateEdit {
+    background-color: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 8px;
+    color: #1f2937;
+}
+
+QLineEdit:disabled, QComboBox:disabled, QDateEdit:disabled {
+    background-color: #e5e7eb;
+    color: #9ca3af;
+}
+
+QLineEdit:focus, QComboBox:focus, QDateEdit:focus {
+    border: 2px solid #3b82f6; /* Blue border on focus */
+}
+
+QComboBox::drop-down {
+    border: none;
+    padding-right: 10px;
+}
+
+/* Lists */
+QListWidget {
+    background-color: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 5px;
+}
+
+QListWidget::item {
+    padding: 8px;
+    border-radius: 4px;
+}
+
+QListWidget::item:selected {
+    background-color: #bfdbfe;
+    color: black;
+}
+
+/* Labels */
+QLabel {
+    font-weight: 500;
+}
+
+/* Checkboxes */
+QCheckBox {
+    spacing: 12px;
+}
+
+QCheckBox::indicator {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #9ca3af;
+    border-radius: 6px;
+    background-color: white;
+}
+
+QCheckBox::indicator:hover {
+    border: 2px solid #3b82f6;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #3b82f6;
+    border: 2px solid #3b82f6;
+    image: url(tick.svg);
+}
