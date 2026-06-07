@@ -10,6 +10,9 @@ import datetime
 import subprocess
 from ui.upload_dialog import UploadDialog
 from ui.manage_properties import ManagePropertiesWidget
+from ui.residential_listing import ResidentialListingWidget
+from ui.commercial_listing import CommercialListingWidget
+from ui.past_tenants import PastTenantsWidget
 from ui.responsive_button import ResponsiveButton
 from excel_exporter import export_to_excel
 import os
@@ -17,7 +20,7 @@ import os
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PCAS - Property Certificate Automation System")
+        self.setWindowTitle("PROMS - Property Management System")
         self.resize(1000, 700)
         self.session = get_session()
         # Dictionary to store tables for each cert type
@@ -30,12 +33,25 @@ class MainWindow(QMainWindow):
 
     def setup_ui(self):
         self.tabs = QTabWidget()
+        self.tabs.setMovable(True)
         self.setCentralWidget(self.tabs)
 
-        # Dashboard Tab
+        # Dashboard Tab (Now Certificates)
         self.dashboard_tab = QWidget()
         self.setup_dashboard_tab()
-        self.tabs.addTab(self.dashboard_tab, "Dashboard")
+        self.tabs.addTab(self.dashboard_tab, "Certificates")
+        
+        # Residential Listing
+        self.res_listing_tab = ResidentialListingWidget()
+        self.tabs.addTab(self.res_listing_tab, "Residential Listing")
+        
+        # Commercial Listing
+        self.com_listing_tab = CommercialListingWidget()
+        self.tabs.addTab(self.com_listing_tab, "Commercial Listing")
+
+        # Past Tenants
+        self.past_tenants_tab = PastTenantsWidget()
+        self.tabs.addTab(self.past_tenants_tab, "Past Tenants")
 
         # Manage Properties Tab
         self.manage_props_tab = ManagePropertiesWidget()
@@ -67,6 +83,7 @@ class MainWindow(QMainWindow):
 
         # Certificate Tabs
         self.cert_tabs = QTabWidget()
+        self.cert_tabs.setMovable(True)
         layout.addWidget(self.cert_tabs)
 
         # Add '+' button to corner of cert tabs
@@ -167,7 +184,12 @@ class MainWindow(QMainWindow):
         
         folder = QFileDialog.getExistingDirectory(self, f"Select Folder for {type_name}")
         if folder:
-            cert_type.folder_path = folder
+            try:
+                from config_manager import get_base_dir
+                rel_path = os.path.relpath(folder, get_base_dir())
+                cert_type.folder_path = rel_path
+            except ValueError:
+                cert_type.folder_path = folder
             self.session.commit()
             QMessageBox.information(self, "Success", f"Folder for '{type_name}' set to:\n{folder}")
 
@@ -199,6 +221,12 @@ class MainWindow(QMainWindow):
         if index == 0:
             self.load_data()
         elif index == 1:
+            self.res_listing_tab.refresh_filters()
+        elif index == 2:
+            self.com_listing_tab.refresh_filters()
+        elif index == 3:
+            self.past_tenants_tab.refresh_filters()
+        elif index == 4:
             self.manage_props_tab.load_companies()
 
     def populate_table(self, table, df):
@@ -312,10 +340,30 @@ class MainWindow(QMainWindow):
         JOIN flats f ON cert.flat_id = f.id
         JOIN properties p ON f.property_id = p.id
         JOIN companies c ON p.company_id = c.id
-        ORDER BY cert.expiry_date ASC
         """
         try:
             df = pd.read_sql_query(query, engine)
+            
+            from utils import address_sort_key
+            import datetime
+            
+            def parse_expiry(x):
+                if pd.isna(x) or not x:
+                    return datetime.date.max
+                if isinstance(x, str):
+                    try:
+                        return datetime.datetime.strptime(x, "%Y-%m-%d").date()
+                    except:
+                        return datetime.date.max
+                return x
+
+            df['ExpSort'] = df['Expiry'].apply(parse_expiry)
+            df['PropStr'] = df['Property'].apply(lambda x: address_sort_key(str(x))[0])
+            df['PropNum'] = df['Property'].apply(lambda x: address_sort_key(str(x))[1])
+            df['FlatStr'] = df['Flat'].apply(lambda x: address_sort_key(str(x))[0])
+            df['FlatNum'] = df['Flat'].apply(lambda x: address_sort_key(str(x))[1])
+
+            df = df.sort_values(by=['ExpSort', 'PropStr', 'PropNum', 'FlatStr', 'FlatNum'])
             
             for type_name, table_widget in self.tables.items():
                 df_type = df[df['Type'] == type_name]

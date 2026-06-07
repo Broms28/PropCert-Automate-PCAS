@@ -5,9 +5,17 @@ from PySide6.QtWidgets import QMessageBox, QFileDialog
 
 def get_app_data_dir():
     app_data = os.getenv('LOCALAPPDATA') or os.path.expanduser('~')
-    folder = os.path.join(app_data, 'PCAS')
-    os.makedirs(folder, exist_ok=True)
-    return folder
+    old_folder = os.path.join(app_data, 'PCAS')
+    new_folder = os.path.join(app_data, 'PROMS')
+    
+    if os.path.exists(old_folder) and not os.path.exists(new_folder):
+        try:
+            os.rename(old_folder, new_folder)
+        except Exception:
+            pass # fallback to creating new if in use
+            
+    os.makedirs(new_folder, exist_ok=True)
+    return new_folder
 
 CONFIG_FILE = os.path.join(get_app_data_dir(), 'config.json')
 

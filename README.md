@@ -1,4 +1,4 @@
-# PropCert Automate (PCAS)
+# Property Management System (PROMS)
 
 PropCert Automate is a modern, responsive Python Desktop Application built with PySide6 (Qt) to help property managers effortlessly track, store, and manage property compliance certificates (e.g., Gas Safety Certificates, EICRs, Fire Alarms).
 

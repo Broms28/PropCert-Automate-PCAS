@@ -114,7 +114,14 @@ QLineEdit:focus, QComboBox:focus, QDateEdit:focus {
 
 QComboBox::drop-down {
     border: none;
-    padding-right: 10px;
+    padding-right: 15px;
+    width: 20px;
+}
+
+QComboBox::down-arrow {
+    image: url(down_arrow.svg);
+    width: 14px;
+    height: 14px;
 }
 
 /* Lists */
@@ -161,4 +168,22 @@ QCheckBox::indicator:checked {
     background-color: #3b82f6;
     border: 2px solid #3b82f6;
     image: url(tick.svg);
+}
+
+/* Context Menus */
+QMenu {
+    background-color: white;
+    color: #1f2937;
+    border: 1px solid #d1d5db;
+    padding: 4px;
+}
+
+QMenu::item {
+    padding: 8px 24px 8px 12px;
+    border-radius: 4px;
+}
+
+QMenu::item:selected {
+    background-color: #bfdbfe; /* Light blue on hover */
+    color: black;
 }

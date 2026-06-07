@@ -1,14 +1,73 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, 
-    QLabel, QInputDialog, QMessageBox, QFileDialog, QAbstractItemView, QListWidgetItem, QStackedWidget
+    QLabel, QInputDialog, QMessageBox, QFileDialog, QAbstractItemView, QListWidgetItem, QStackedWidget, QDialog, QLineEdit, QButtonGroup
 )
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QColor
 from PySide6.QtCore import Qt, QUrl
+import qtawesome as qta
 from db import get_session, Company, Property, Flat
+from utils import property_sort_key
 import os
 from config_manager import get_base_dir
 
 BASE_DIR = get_base_dir()
+
+class AddPropertyDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Add Property")
+        self.resize(350, 200)
+        
+        layout = QVBoxLayout(self)
+        
+        layout.addWidget(QLabel("Property Address:"))
+        self.address_input = QLineEdit()
+        layout.addWidget(self.address_input)
+        
+        layout.addWidget(QLabel("Property Type:"))
+        
+        type_layout = QHBoxLayout()
+        self.btn_res = QPushButton("Residential")
+        self.btn_res.setCheckable(True)
+        self.btn_res.setChecked(True)
+        
+        self.btn_com = QPushButton("Commercial")
+        self.btn_com.setCheckable(True)
+        
+        self.type_group = QButtonGroup()
+        self.type_group.addButton(self.btn_res)
+        self.type_group.addButton(self.btn_com)
+        
+        toggle_style = """
+            QPushButton {
+                background-color: #f3f4f6;
+                color: #4b5563;
+                border: 1px solid #d1d5db;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:checked {
+                background-color: #2563eb;
+                color: white;
+                border: 1px solid #1d4ed8;
+            }
+        """
+        self.btn_res.setStyleSheet(toggle_style)
+        self.btn_com.setStyleSheet(toggle_style)
+        
+        type_layout.addWidget(self.btn_res)
+        type_layout.addWidget(self.btn_com)
+        layout.addLayout(type_layout)
+        
+        btn_layout = QHBoxLayout()
+        self.btn_ok = QPushButton("Submit")
+        self.btn_ok.clicked.connect(self.accept)
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.btn_ok)
+        layout.addLayout(btn_layout)
+
+    def get_data(self):
+        return self.address_input.text(), "Residential" if self.btn_res.isChecked() else "Commercial"
 
 class ManagePropertiesWidget(QWidget):
     def __init__(self):
@@ -20,8 +79,6 @@ class ManagePropertiesWidget(QWidget):
     def setup_ui(self):
         layout = QHBoxLayout(self)
 
-        import qtawesome as qta
-        
         # Companies List
         comp_layout = QVBoxLayout()
         comp_layout.addWidget(QLabel("Companies"))
@@ -79,9 +136,9 @@ class ManagePropertiesWidget(QWidget):
         btn_layout_p.addWidget(self.btn_del_p)
         prop_layout.addLayout(btn_layout_p)
 
-        # Flats List
+        # Flats / Units List
         flat_layout = QVBoxLayout()
-        flat_layout.addWidget(QLabel("Flats"))
+        flat_layout.addWidget(QLabel("Flats / Units"))
         self.flat_stack = QStackedWidget()
         
         self.flat_list = QListWidget()
@@ -160,9 +217,10 @@ class ManagePropertiesWidget(QWidget):
         self.prop_list.clear()
         comp_id = items[0].data(32)
         
-        properties = self.session.query(Property).filter(Property.company_id == comp_id).order_by(Property.address).all()
-        for p in properties:
-            self.prop_list.addItem(p.address)
+        properties = self.session.query(Property).filter(Property.company_id == comp_id).all()
+        for p in sorted(properties, key=property_sort_key):
+            item = QListWidgetItem(p.address)
+            self.prop_list.addItem(item)
             item = self.prop_list.item(self.prop_list.count() - 1)
             item.setData(32, p.id)
 
@@ -186,6 +244,19 @@ class ManagePropertiesWidget(QWidget):
             self.flat_list.addItem(f.name)
             item = self.flat_list.item(self.flat_list.count() - 1)
             item.setData(32, f.id)
+
+    def get_actual_path(self, stored_path):
+        if not stored_path:
+            return None
+        if os.path.isabs(stored_path):
+            if os.path.exists(stored_path):
+                return stored_path
+            # If absolute but doesn't exist, it might be from another computer's drive letter.
+            # Try to strip the drive letter and append to BASE_DIR
+            drive, tail = os.path.splitdrive(stored_path)
+            tail = tail.lstrip('\\/')
+            return os.path.normpath(os.path.join(BASE_DIR, tail))
+        return os.path.normpath(os.path.join(BASE_DIR, stored_path))
 
     def open_folder(self, path):
         os.makedirs(path, exist_ok=True)
@@ -226,7 +297,11 @@ class ManagePropertiesWidget(QWidget):
         if c:
             folder = QFileDialog.getExistingDirectory(self, f"Select Folder for {c.name}")
             if folder:
-                c.folder_path = folder
+                try:
+                    rel_path = os.path.relpath(folder, BASE_DIR)
+                    c.folder_path = rel_path
+                except ValueError:
+                    c.folder_path = folder
                 self.session.commit()
                 QMessageBox.information(self, "Success", f"Folder for {c.name} set to:\n{folder}")
 
@@ -235,7 +310,7 @@ class ManagePropertiesWidget(QWidget):
         c = self.session.query(Company).get(comp_id)
         if c:
             if c.folder_path:
-                self.open_folder(c.folder_path)
+                self.open_folder(self.get_actual_path(c.folder_path))
             else:
                 default_path = os.path.join(BASE_DIR, c.name)
                 c.folder_path = default_path
@@ -247,13 +322,16 @@ class ManagePropertiesWidget(QWidget):
         items = self.comp_list.selectedItems()
         if not items: return
         comp_id = items[0].data(32)
-        address, ok = QInputDialog.getText(self, "Add Property", "Property Address:")
-        if ok and address:
-            p = Property(company_id=comp_id, address=address)
-            # Ask for folder location
-            reply = QMessageBox.question(self, 'Folder Location', 
-                                         "Would you like to set a custom folder location for this property now?",
-                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        
+        dialog = AddPropertyDialog(self)
+        if dialog.exec():
+            address, prop_type = dialog.get_data()
+            if address:
+                p = Property(company_id=comp_id, address=address, property_type=prop_type)
+                # Ask for folder location
+                reply = QMessageBox.question(self, 'Folder Location', 
+                                             "Would you like to set a custom folder location for this property now?",
+                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
                 folder = QFileDialog.getExistingDirectory(self, f"Select Folder for {address}")
                 if folder:
@@ -281,7 +359,11 @@ class ManagePropertiesWidget(QWidget):
         if p:
             folder = QFileDialog.getExistingDirectory(self, f"Select Folder for {p.address}")
             if folder:
-                p.folder_path = folder
+                try:
+                    rel_path = os.path.relpath(folder, BASE_DIR)
+                    p.folder_path = rel_path
+                except ValueError:
+                    p.folder_path = folder
                 self.session.commit()
                 QMessageBox.information(self, "Success", f"Folder for {p.address} set to:\n{folder}")
 
@@ -290,7 +372,7 @@ class ManagePropertiesWidget(QWidget):
         p = self.session.query(Property).get(prop_id)
         if p:
             if p.folder_path:
-                self.open_folder(p.folder_path)
+                self.open_folder(self.get_actual_path(p.folder_path))
             else:
                 comp = self.session.query(Company).get(p.company_id)
                 comp_root = comp.folder_path if comp.folder_path else os.path.join(BASE_DIR, comp.name)
@@ -304,11 +386,11 @@ class ManagePropertiesWidget(QWidget):
         items = self.prop_list.selectedItems()
         if not items: return
         prop_id = items[0].data(32)
-        name, ok = QInputDialog.getText(self, "Add Flat", "Flat Name (e.g. Flat 1):")
+        name, ok = QInputDialog.getText(self, "Add Flat / Unit", "Flat / Unit Name (e.g. Suite A, Flat 1):")
         if ok and name:
             f = Flat(property_id=prop_id, name=name)
             reply = QMessageBox.question(self, 'Folder Location', 
-                                         "Would you like to set a custom folder location for this flat now?",
+                                         "Would you like to set a custom folder location for this unit now?",
                                          QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
                 folder = QFileDialog.getExistingDirectory(self, f"Select Folder for {name}")
@@ -337,7 +419,11 @@ class ManagePropertiesWidget(QWidget):
         if f:
             folder = QFileDialog.getExistingDirectory(self, f"Select Folder for {f.name}")
             if folder:
-                f.folder_path = folder
+                try:
+                    rel_path = os.path.relpath(folder, BASE_DIR)
+                    f.folder_path = rel_path
+                except ValueError:
+                    f.folder_path = folder
                 self.session.commit()
                 QMessageBox.information(self, "Success", f"Folder for {f.name} set to:\n{folder}")
 
@@ -346,7 +432,7 @@ class ManagePropertiesWidget(QWidget):
         f = self.session.query(Flat).get(flat_id)
         if f:
             if f.folder_path:
-                self.open_folder(f.folder_path)
+                self.open_folder(self.get_actual_path(f.folder_path))
             else:
                 p = self.session.query(Property).get(f.property_id)
                 comp = self.session.query(Company).get(p.company_id)

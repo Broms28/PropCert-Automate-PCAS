@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QPushButton, QFileDialog, QMessageBox, QHBoxLayout, QLabel, QCheckBox
 )
 from PySide6.QtCore import QDate, Qt
-from db import get_session, Company, Property, Flat, Certificate, CertificateType
+from db import get_session, Company, Property, Flat, Certificate, CertificateType, ResidentialTenant, CommercialTenant
 from file_manager import save_certificate
 import datetime
 
@@ -113,6 +113,12 @@ class UploadDialog(QDialog):
         date_layout.addWidget(self.date_expiry)
         date_layout.addWidget(self.chk_no_expiry)
         form.addRow("Expiry Date:", date_layout)
+        
+        # Email Tenants Checkbox
+        self.chk_email = QCheckBox("Email certificate to tenants")
+        self.chk_email.setToolTip("Opens an Outlook email with the new certificate attached and tenants BCC'd.")
+        self.chk_email.setChecked(False)
+        form.addRow("", self.chk_email)
 
         layout.addLayout(form)
 
@@ -152,8 +158,11 @@ class UploadDialog(QDialog):
     def on_general_changed(self, state):
         if state == 2:
             self.cb_flat.setEnabled(False)
+            self.chk_email.setChecked(False)
+            self.chk_email.setEnabled(False)
         else:
             self.cb_flat.setEnabled(True)
+            self.chk_email.setEnabled(True)
 
     def load_companies(self):
         self.cb_company.clear()
@@ -277,7 +286,43 @@ class UploadDialog(QDialog):
             self.session.commit()
 
             QMessageBox.information(self, "Success", f"Certificate uploaded and saved to:\n{dest_path}")
+            
+            # Generate Email if ticked
+            if not self.chk_general.isChecked() and self.chk_email.isChecked():
+                self.create_email(dest_path, cert_type, comp_name, flat_id)
+                
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to upload certificate:\n{e}")
             self.session.rollback()
+
+    def create_email(self, attachment_path, cert_type, comp_name, flat_id):
+        try:
+            # Find all emails for this flat
+            res_tenants = self.session.query(ResidentialTenant).filter(ResidentialTenant.flat_id == flat_id).all()
+            com_tenants = self.session.query(CommercialTenant).filter(CommercialTenant.flat_id == flat_id).all()
+            
+            emails = []
+            for t in res_tenants + com_tenants:
+                if t.email and t.email.strip():
+                    emails.append(t.email.strip())
+                    
+            bcc_str = "; ".join(emails)
+            
+            import win32com.client
+            outlook = win32com.client.Dispatch('outlook.application')
+            mail = outlook.CreateItem(0) # 0 corresponds to olMailItem
+            
+            mail.BCC = bcc_str
+            mail.Subject = f"Your Flat's New {cert_type}"
+            mail.Body = f"Dear tenant,\n\nPlease see attached your flat's new {cert_type} for your records.\n\nKind regards,\n{comp_name} Team"
+            
+            # Use absolute path for Outlook attachment
+            import os
+            abs_path = os.path.abspath(attachment_path)
+            mail.Attachments.Add(abs_path)
+            
+            mail.Display(True) # Display the email modal
+            
+        except Exception as e:
+            QMessageBox.warning(self, "Email Error", f"Could not create Outlook email. Is Outlook installed and configured?\n\nError: {str(e)}")
