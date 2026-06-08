@@ -268,13 +268,11 @@ class MainWindow(QMainWindow):
             item_expiry.setFlags(item_expiry.flags() & ~Qt.ItemIsEditable)
 
             # Highlight logic
-            if expiry_date_obj:
-                if expiry_date_obj < today:
-                    item_expiry.setBackground(QColor(255, 100, 100))
-                    item_expiry.setForeground(QColor("white"))
-                elif expiry_date_obj <= warning_date:
-                    item_expiry.setBackground(QColor(255, 255, 150))
-                    item_expiry.setForeground(QColor("black"))
+            if expiry_date_obj and expiry_date_obj <= warning_date:
+                item_expiry.setForeground(QColor("#ef4444"))
+                font = item_expiry.font()
+                font.setBold(True)
+                item_expiry.setFont(font)
             
             table.setItem(row_idx, 2, item_expiry)
 

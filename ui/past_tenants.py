@@ -60,7 +60,7 @@ class PastTenantsWidget(QWidget):
         self.res_table.setHorizontalHeaderLabels(["Property Address", "Flat", "Tenant Name", "Email", "Move Out Date", "Actions"])
         self.res_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.res_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
-        self.res_table.setColumnWidth(5, 60)
+        self.res_table.setColumnWidth(5, 90)
         self.res_table.setWordWrap(True)
         layout.addWidget(self.res_table)
         
@@ -71,7 +71,7 @@ class PastTenantsWidget(QWidget):
         self.com_table.setHorizontalHeaderLabels(["Property Address", "Unit", "Tenant/Company", "Email", "Move Out Date", "Actions"])
         self.com_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.com_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
-        self.com_table.setColumnWidth(5, 60)
+        self.com_table.setColumnWidth(5, 90)
         self.com_table.setWordWrap(True)
         layout.addWidget(self.com_table)
 
